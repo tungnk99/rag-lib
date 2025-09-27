@@ -1,0 +1,196 @@
+[build-system]
+requires = ["setuptools>=65.0.0", "wheel>=0.37.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-lib"
+description = "A lightweight Python library for building Retrieval-Augmented Generation (RAG) systems"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "TungNK", email = "tungnk.hust@gmail.com"}
+]
+maintainers = [
+    {name = "TungNK", email = "tungnk.hust@gmail.com"}
+]
+keywords = [
+    "rag", 
+    "retrieval-augmented-generation", 
+    "llm", 
+    "nlp", 
+    "machine-learning", 
+    "ai", 
+    "embeddings", 
+    "vector-search",
+    "information-retrieval", 
+    "question-answering"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Linguistic",
+]
+dynamic = ["version"]
+requires-python = ">=3.8"
+
+# Core dependencies - minimal requirements
+dependencies = [
+    "typing-extensions>=4.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+# OpenAI integration
+openai = [
+    "openai>=1.109.1",
+]
+
+# SBERT/Sentence Transformers integration
+sbert = [
+    "sentence-transformers>=2.2.0",
+    "torch>=1.11.0",
+    "numpy>=1.21.0",
+]
+
+# Development dependencies
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "numpy>=2.3.3"
+]
+
+# Documentation dependencies
+docs = [
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.2.0",
+]
+
+# All optional dependencies
+all = [
+    "rag-lib[openai,sbert,dev,docs]",
+]
+
+[project.urls]
+Homepage = "https://github.com/tungnk99/rag-lib"
+Repository = "https://github.com/tungnk99/rag-lib"
+"Bug Tracker" = "https://github.com/tungnk99/rag-lib/issues"
+Documentation = "https://github.com/tungnk99/rag-lib"
+
+# [project.scripts]
+# rag-cli = "rag_lib.cli:main"  # Uncomment if you add CLI
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "rag_lib.__version__"}
+
+# Black configuration
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+# isort configuration
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["rag_lib"]
+
+# pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*"]
+addopts = [
+    "--cov=rag_lib",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--strict-markers",
+    "-v"
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# mypy configuration
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "openai.*",
+]
+ignore_missing_imports = true
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["src/rag_lib"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
