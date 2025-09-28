@@ -11,8 +11,9 @@ Dependencies:
 
 from typing import List
 from pathlib import Path
+import time
 from ._base import BaseReader
-from ..schemas.schema import Element, ElementType, create_element
+from ..schemas.schema import Element, ElementType, create_element, FileContent
 
 
 class DocxReader(BaseReader):
@@ -78,7 +79,7 @@ class DocxReader(BaseReader):
         extension = Path(file_path).suffix.lower()
         return extension in self.SUPPORTED_EXTENSIONS
     
-    def read(self, file_path: str) -> List[Element]:
+    def read(self, file_path: str) -> FileContent:
         """
         Read a DOCX file and extract its content.
         
@@ -86,12 +87,14 @@ class DocxReader(BaseReader):
             file_path (str): Path to the DOCX file to read
             
         Returns:
-            List[Element]: List of extracted elements (text, tables, images)
+            FileContent: File content object containing extracted elements and metadata
             
         Raises:
             FileNotFoundError: If the file doesn't exist
             Exception: For other reading errors
         """
+        start_time = time.time()
+        
         try:
             from docx import Document
             
@@ -112,7 +115,24 @@ class DocxReader(BaseReader):
             if self.extract_images:
                 elements.extend(self._extract_images(doc))
             
-            return elements
+            # Calculate processing time
+            processing_time = time.time() - start_time
+            
+            # Get document properties for metadata
+            doc_metadata = self.get_document_info(file_path)
+            doc_metadata.update({
+                'extract_tables': self.extract_tables,
+                'extract_images': self.extract_images,
+                'split_by_paragraphs': self.split_by_paragraphs,
+                'total_elements': len(elements)
+            })
+            
+            # Create and return FileContent
+            return self.create_file_content(
+                file_path=file_path,
+                elements=elements,
+                processing_time=processing_time
+            )
             
         except Exception as e:
             raise Exception(f"Error reading DOCX file {file_path}: {str(e)}")

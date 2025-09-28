@@ -3,13 +3,14 @@ Base reader class for document reading functionality.
 
 This module provides the abstract base class for all document readers in the RAG system.
 Each reader is responsible for extracting content from specific file formats and
-returning a list of elements (text, image, table).
+returning a FileContent object containing elements (text, image, table) and metadata.
 """
 
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from ..schemas.schema import Element
+from datetime import datetime
+from ..schemas.schema import Element, FileContent
 
 
 class BaseReader(ABC):
@@ -18,7 +19,7 @@ class BaseReader(ABC):
     
     This class defines the interface that all concrete readers must implement.
     Each reader should be able to read a specific file format and extract
-    its content as a list of elements.
+    its content as a FileContent object.
     """
     
     def __init__(self, **kwargs):
@@ -31,15 +32,15 @@ class BaseReader(ABC):
         self.config = kwargs
     
     @abstractmethod
-    def read(self, file_path: str) -> List[Element]:
+    def read(self, file_path: str) -> FileContent:
         """
-        Read a file and extract its content as a list of elements.
+        Read a file and extract its content as a FileContent object.
         
         Args:
             file_path (str): Path to the file to read
             
         Returns:
-            List[Element]: List of extracted elements (text, image, table)
+            FileContent: File content object containing elements and metadata
             
         Raises:
             FileNotFoundError: If the file doesn't exist
@@ -120,16 +121,37 @@ class BaseReader(ABC):
             "extension": self.get_file_extension(file_path)
         }
     
-    def read_with_metadata(self, file_path: str, include_file_metadata: bool = True) -> List[Element]:
+    def create_file_content(self, file_path: str, elements: List[Element], 
+                           processing_time: Optional[float] = None) -> FileContent:
         """
-        Read a file and optionally include file metadata in each element.
+        Create a FileContent object with file metadata.
+        
+        Args:
+            file_path (str): Path to the file
+            elements (List[Element]): List of extracted elements
+            processing_time (Optional[float]): Time taken to process the file
+            
+        Returns:
+            FileContent: File content object with metadata
+        """
+        file_metadata = self.get_file_metadata(file_path)
+        
+        return FileContent(
+            file_path=file_path,
+            elements=elements,
+            metadata=file_metadata,
+            processing_time=processing_time
+        )
+    
+    def read_with_validation(self, file_path: str) -> FileContent:
+        """
+        Read a file with validation and return FileContent.
         
         Args:
             file_path (str): Path to the file to read
-            include_file_metadata (bool): Whether to include file metadata in elements
             
         Returns:
-            List[Element]: List of extracted elements with optional file metadata
+            FileContent: File content object containing elements and metadata
         """
         # Validate file first
         self.validate_file(file_path)
@@ -138,16 +160,8 @@ class BaseReader(ABC):
         if not self.supports_format(file_path):
             raise ValueError(f"File format not supported by {self.__class__.__name__}: {file_path}")
         
-        # Read the file
-        elements = self.read(file_path)
-        
-        # Add file metadata to each element if requested
-        if include_file_metadata:
-            file_metadata = self.get_file_metadata(file_path)
-            for element in elements:
-                element.metadata.update(file_metadata)
-        
-        return elements
+        # Read the file and return FileContent
+        return self.read(file_path)
     
     def __str__(self) -> str:
         """String representation of the reader."""
@@ -161,6 +175,7 @@ class BaseReader(ABC):
 class MultiFormatReader:
     """
     A reader that can handle multiple file formats by delegating to specific readers.
+    Returns FileContent objects containing extracted elements and metadata.
     """
     
     def __init__(self):
@@ -194,16 +209,15 @@ class MultiFormatReader:
                 return reader
         return None
     
-    def read(self, file_path: str, include_file_metadata: bool = True) -> List[Element]:
+    def read(self, file_path: str) -> FileContent:
         """
         Read a file using an appropriate reader.
         
         Args:
             file_path (str): Path to the file to read
-            include_file_metadata (bool): Whether to include file metadata in elements
             
         Returns:
-            List[Element]: List of extracted elements
+            FileContent: File content object containing elements and metadata
             
         Raises:
             ValueError: If no suitable reader is found for the file format
@@ -213,7 +227,7 @@ class MultiFormatReader:
             extension = Path(file_path).suffix.lower()
             raise ValueError(f"No reader available for file format: {extension}")
         
-        return reader.read_with_metadata(file_path, include_file_metadata)
+        return reader.read_with_validation(file_path)
     
     def list_supported_formats(self) -> List[str]:
         """

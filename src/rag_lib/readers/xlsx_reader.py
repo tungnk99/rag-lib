@@ -10,8 +10,9 @@ Dependencies:
 
 from typing import List, Optional, Dict, Any
 from pathlib import Path
+import time
 from ._base import BaseReader
-from ..schemas.schema import Element, ElementType, create_element
+from ..schemas.schema import Element, ElementType, create_element, FileContent
 
 
 class XlsxReader(BaseReader):
@@ -77,7 +78,7 @@ class XlsxReader(BaseReader):
         extension = Path(file_path).suffix.lower()
         return extension in self.SUPPORTED_EXTENSIONS
     
-    def read(self, file_path: str) -> List[Element]:
+    def read(self, file_path: str) -> FileContent:
         """
         Read an XLSX file and extract its content.
         
@@ -85,12 +86,14 @@ class XlsxReader(BaseReader):
             file_path (str): Path to the XLSX file to read
             
         Returns:
-            List[Element]: List of extracted elements (tables and text)
+            FileContent: File content object containing extracted elements and metadata
             
         Raises:
             FileNotFoundError: If the file doesn't exist
             Exception: For other reading errors
         """
+        start_time = time.time()
+        
         try:
             import openpyxl
             from openpyxl.utils import get_column_letter
@@ -117,7 +120,27 @@ class XlsxReader(BaseReader):
                 elements.extend(sheet_elements)
             
             workbook.close()
-            return elements
+            
+            # Calculate processing time
+            processing_time = time.time() - start_time
+            
+            # Get workbook properties for metadata
+            xlsx_metadata = self.get_workbook_info(file_path)
+            xlsx_metadata.update({
+                'include_formulas': self.include_formulas,
+                'include_empty_cells': self.include_empty_cells,
+                'max_rows': self.max_rows,
+                'max_cols': self.max_cols,
+                'processed_sheets': sheets_to_process,
+                'total_elements': len(elements)
+            })
+            
+            # Create and return FileContent
+            return self.create_file_content(
+                file_path=file_path,
+                elements=elements,
+                processing_time=processing_time
+            )
             
         except Exception as e:
             raise Exception(f"Error reading XLSX file {file_path}: {str(e)}")
@@ -302,7 +325,7 @@ class XlsxReader(BaseReader):
     
     def read_specific_range(self, file_path: str, sheet_name: str, 
                           start_row: int, end_row: int, 
-                          start_col: int, end_col: int) -> List[Element]:
+                          start_col: int, end_col: int) -> FileContent:
         """
         Read a specific range from a worksheet.
         
@@ -315,7 +338,7 @@ class XlsxReader(BaseReader):
             end_col (int): Ending column (1-based)
             
         Returns:
-            List[Element]: Extracted elements from the specified range
+            FileContent: File content object containing extracted elements from the specified range
         """
         try:
             import openpyxl
@@ -342,6 +365,7 @@ class XlsxReader(BaseReader):
             
             workbook.close()
             
+            elements = []
             if table_data:
                 table_text = self._table_to_text(table_data)
                 
@@ -358,9 +382,21 @@ class XlsxReader(BaseReader):
                     content=table_text,
                     metadata=metadata
                 )
-                return [element]
+                elements.append(element)
             
-            return []
+            # Create FileContent
+            range_metadata = {
+                'sheet_name': sheet_name,
+                'range': f"{start_row}:{end_row},{start_col}:{end_col}",
+                'extraction_method': 'range_specific',
+                'total_elements': len(elements)
+            }
+            
+            return self.create_file_content(
+                file_path=file_path,
+                elements=elements,
+                processing_time=None
+            )
             
         except Exception as e:
             raise Exception(f"Error reading range from XLSX file: {str(e)}")

@@ -7,8 +7,9 @@ their content as text elements.
 
 from typing import List
 from pathlib import Path
+import time
 from ._base import BaseReader
-from ..schemas.schema import Element, ElementType, create_element
+from ..schemas.schema import Element, ElementType, create_element, FileContent
 
 
 class TxtReader(BaseReader):
@@ -48,7 +49,7 @@ class TxtReader(BaseReader):
         extension = Path(file_path).suffix.lower()
         return extension in self.SUPPORTED_EXTENSIONS
     
-    def read(self, file_path: str) -> List[Element]:
+    def read(self, file_path: str) -> FileContent:
         """
         Read a text file and extract its content.
         
@@ -56,21 +57,37 @@ class TxtReader(BaseReader):
             file_path (str): Path to the text file to read
             
         Returns:
-            List[Element]: List of text elements
+            FileContent: File content object containing extracted elements and metadata
             
         Raises:
             FileNotFoundError: If the file doesn't exist
             UnicodeDecodeError: If the file cannot be decoded with the specified encoding
             Exception: For other reading errors
         """
+        start_time = time.time()
+        
         try:
             with open(file_path, 'r', encoding=self.encoding) as file:
                 content = file.read()
             
-            if not content.strip():
-                return []
-            
             elements = []
+            
+            if not content.strip():
+                # Even for empty files, create FileContent with empty elements
+                processing_time = time.time() - start_time
+                txt_metadata = {
+                    'encoding': self.encoding,
+                    'split_by_lines': self.split_by_lines,
+                    'total_elements': 0,
+                    'char_count': 0,
+                    'word_count': 0,
+                    'line_count': 0
+                }
+                return self.create_file_content(
+                    file_path=file_path,
+                    elements=elements,
+                    processing_time=processing_time
+                )
             
             if self.split_by_lines:
                 # Split content by lines and create separate elements
@@ -102,7 +119,25 @@ class TxtReader(BaseReader):
                 )
                 elements.append(element)
             
-            return elements
+            # Calculate processing time
+            processing_time = time.time() - start_time
+            
+            # Create metadata
+            txt_metadata = {
+                'encoding': self.encoding,
+                'split_by_lines': self.split_by_lines,
+                'total_elements': len(elements),
+                'char_count': len(content),
+                'word_count': len(content.split()),
+                'line_count': len(content.split('\n'))
+            }
+            
+            # Create and return FileContent
+            return self.create_file_content(
+                file_path=file_path,
+                elements=elements,
+                processing_time=processing_time
+            )
             
         except UnicodeDecodeError as e:
             raise UnicodeDecodeError(

@@ -12,8 +12,9 @@ Dependencies:
 
 from typing import List, Optional
 from pathlib import Path
+import time
 from ._base import BaseReader
-from ..schemas.schema import Element, ElementType, create_element
+from ..schemas.schema import Element, ElementType, create_element, FileContent
 
 
 class PdfReader(BaseReader):
@@ -92,7 +93,7 @@ class PdfReader(BaseReader):
         extension = Path(file_path).suffix.lower()
         return extension in self.SUPPORTED_EXTENSIONS
     
-    def read(self, file_path: str) -> List[Element]:
+    def read(self, file_path: str) -> FileContent:
         """
         Read a PDF file and extract its content.
         
@@ -100,12 +101,14 @@ class PdfReader(BaseReader):
             file_path (str): Path to the PDF file to read
             
         Returns:
-            List[Element]: List of extracted elements (text, tables, images)
+            FileContent: File content object containing extracted elements and metadata
             
         Raises:
             FileNotFoundError: If the file doesn't exist
             Exception: For other reading errors
         """
+        start_time = time.time()
+        
         elements = []
         
         if self.pdf_library == 'PyPDF2':
@@ -116,7 +119,24 @@ class PdfReader(BaseReader):
         if self.extract_images:
             elements.extend(self._extract_images(file_path))
         
-        return elements
+        # Calculate processing time
+        processing_time = time.time() - start_time
+        
+        # Create metadata
+        pdf_metadata = {
+            'pdf_library': self.pdf_library,
+            'extract_tables': self.extract_tables,
+            'extract_images': self.extract_images,
+            'split_by_pages': self.split_by_pages,
+            'total_elements': len(elements)
+        }
+        
+        # Create and return FileContent
+        return self.create_file_content(
+            file_path=file_path,
+            elements=elements,
+            processing_time=processing_time
+        )
     
     def _read_with_pypdf2(self, file_path: str) -> List[Element]:
         """Read PDF using PyPDF2 library."""

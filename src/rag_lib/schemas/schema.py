@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 from enum import Enum
 import uuid
+import os
 
 
 class ElementType(Enum):
@@ -55,6 +56,83 @@ class Element:
         """Create Element from dictionary representation."""
         data = data.copy()
         data["type"] = ElementType(data["type"])
+        return cls(**data)
+
+
+@dataclass
+class FileContent:
+    """
+    Represents the content extracted from a file by a reader.
+    
+    Attributes:
+        file_path (str): Path to the source file
+        elements (List[Element]): List of elements extracted from the file
+        metadata (Dict[str, Any]): File-level metadata (file_size, file_type, processed_at, etc.)
+        processing_time (Optional[float]): Time taken to process the file in seconds
+    """
+    file_path: str
+    elements: List[Element] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    processing_time: Optional[float] = None
+    
+    def __post_init__(self):
+        """Validate file content after initialization."""
+        if not self.file_path.strip():
+            raise ValueError("File path cannot be empty")
+        
+        if self.processing_time is not None and self.processing_time < 0:
+            raise ValueError("Processing time must be non-negative")
+        
+        # Set default metadata if not provided
+        if "processed_at" not in self.metadata:
+            self.metadata["processed_at"] = datetime.now().isoformat()
+        
+        if "file_type" not in self.metadata:
+            # Try to infer file type from extension
+            _, ext = os.path.splitext(self.file_path)
+            self.metadata["file_type"] = ext.lower() if ext else "unknown"
+    
+    def get_elements_by_type(self, element_type: ElementType) -> List[Element]:
+        """Get all elements of a specific type."""
+        return [element for element in self.elements if element.type == element_type]
+    
+    def get_text_content(self) -> str:
+        """Get all text content concatenated."""
+        text_elements = self.get_elements_by_type(ElementType.TEXT)
+        return "\n".join(element.content for element in text_elements)
+    
+    def get_total_elements_count(self) -> int:
+        """Get total number of elements."""
+        return len(self.elements)
+    
+    def get_elements_count_by_type(self) -> Dict[str, int]:
+        """Get count of elements by type."""
+        count = {}
+        for element in self.elements:
+            element_type = element.type.value
+            count[element_type] = count.get(element_type, 0) + 1
+        return count
+    
+    def add_element(self, element: Element) -> None:
+        """Add an element to the file content."""
+        if not isinstance(element, Element):
+            raise TypeError("Must be an Element instance")
+        self.elements.append(element)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert file content to dictionary representation."""
+        return {
+            "file_path": self.file_path,
+            "elements": [element.to_dict() for element in self.elements],
+            "metadata": self.metadata,
+            "processing_time": self.processing_time
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'FileContent':
+        """Create FileContent from dictionary representation."""
+        data = data.copy()
+        data["elements"] = [Element.from_dict(element_data) for element_data in data.get("elements", [])]
         return cls(**data)
 
 
@@ -343,3 +421,39 @@ def batch_create_elements(elements_data: List[Dict[str, Any]]) -> List[Element]:
         List[Element]: List of created element objects
     """
     return [Element.from_dict(element_data) for element_data in elements_data]
+
+
+def create_file_content(file_path: str, elements: Optional[List[Element]] = None, 
+                       metadata: Optional[Dict[str, Any]] = None, 
+                       processing_time: Optional[float] = None) -> FileContent:
+    """
+    Convenience function to create a FileContent object.
+    
+    Args:
+        file_path (str): Path to the source file
+        elements (Optional[List[Element]]): List of elements extracted from the file
+        metadata (Optional[Dict[str, Any]]): File-level metadata
+        processing_time (Optional[float]): Time taken to process the file
+    
+    Returns:
+        FileContent: Created file content object
+    """
+    return FileContent(
+        file_path=file_path,
+        elements=elements or [],
+        metadata=metadata or {},
+        processing_time=processing_time
+    )
+
+
+def batch_create_file_contents(file_contents_data: List[Dict[str, Any]]) -> List[FileContent]:
+    """
+    Create multiple file contents from a list of dictionaries.
+    
+    Args:
+        file_contents_data (List[Dict[str, Any]]): List of file content data dictionaries
+    
+    Returns:
+        List[FileContent]: List of created file content objects
+    """
+    return [FileContent.from_dict(file_data) for file_data in file_contents_data]
