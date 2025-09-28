@@ -6,9 +6,56 @@ used throughout the RAG pipeline.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
+from enum import Enum
 import uuid
+
+
+class ElementType(Enum):
+    """Enum for different types of document elements."""
+    TEXT = "text"
+    IMAGE = "image"
+    TABLE = "table"
+
+
+@dataclass
+class Element:
+    """
+    Represents an element extracted from a document.
+    
+    Attributes:
+        type (ElementType): The type of element (text, image, table)
+        content (str): The content of the element (text content, image path/base64, table as string/html)
+        metadata (Dict[str, Any]): Additional metadata (page_number, coordinates, format, etc.)
+    """
+    type: ElementType
+    content: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def __post_init__(self):
+        """Validate element after initialization."""
+        if not self.content.strip():
+            raise ValueError("Element content cannot be empty")
+        
+        # Set default metadata if not provided
+        if "page_number" not in self.metadata:
+            self.metadata["page_number"] = 1
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert element to dictionary representation."""
+        return {
+            "type": self.type.value,
+            "content": self.content,
+            "metadata": self.metadata
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Element':
+        """Create Element from dictionary representation."""
+        data = data.copy()
+        data["type"] = ElementType(data["type"])
+        return cls(**data)
 
 
 @dataclass
@@ -268,3 +315,31 @@ def batch_create_documents(documents_data: List[Dict[str, Any]]) -> List[Documen
         List[Document]: List of created document objects
     """
     return [Document.from_dict(doc_data) for doc_data in documents_data]
+
+
+def create_element(element_type: ElementType, content: str, metadata: Optional[Dict[str, Any]] = None) -> Element:
+    """
+    Convenience function to create an Element object.
+    
+    Args:
+        element_type (ElementType): Type of element
+        content (str): Element content
+        metadata (Optional[Dict[str, Any]]): Element metadata
+    
+    Returns:
+        Element: Created element object
+    """
+    return Element(type=element_type, content=content, metadata=metadata or {})
+
+
+def batch_create_elements(elements_data: List[Dict[str, Any]]) -> List[Element]:
+    """
+    Create multiple elements from a list of dictionaries.
+    
+    Args:
+        elements_data (List[Dict[str, Any]]): List of element data dictionaries
+    
+    Returns:
+        List[Element]: List of created element objects
+    """
+    return [Element.from_dict(element_data) for element_data in elements_data]
